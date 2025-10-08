@@ -27,7 +27,7 @@ function registerWorkspacesTool(server) {
 
     server.tool(
         "get_workspace_details",
-        "Get details of a specific workspace",
+        "Get details of a specific workspace by ID or name",
         { workspace_id: "string" },
         async (params) => {
             const { workspace_id } = params;
@@ -39,7 +39,7 @@ function registerWorkspacesTool(server) {
             ];
             
             let messageResponse;
-            if (dummyWorkspaces.find(ws => ws.id === workspace_id)) {
+            if (dummyWorkspaces.find(ws => ws.id === workspace_id || ws.name.toLowerCase() === workspace_id.toLowerCase())) {
                 messageResponse = `Workspace Details - ID: ${workspace.id}, Name: ${workspace.name}`;
             } else {
                 messageResponse = `Workspace with ID ${workspace_id} not found.`;

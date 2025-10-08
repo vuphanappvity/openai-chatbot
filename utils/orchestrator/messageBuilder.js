@@ -6,7 +6,7 @@ export function buildMessages(type = 'ask', userPrompt = '', vectorContext = '',
         { role: 'user', content: buildUserMessageContext(userPrompt, vectorContext) },
     ];
     if (toolCalls.length > 0) {
-        messages.push({ role: 'assistant', content: null, tool_call: tc });
+        messages.push({ role: 'assistant', content: null, tool_calls: toolCalls });
         toolCalls.forEach(tc => {
             messages.push({ role: 'tool', name: tc.function.name, content: JSON.stringify(tc['toolCallResponse']), tool_call_id: tc.id });
         });
@@ -17,8 +17,15 @@ export function buildMessages(type = 'ask', userPrompt = '', vectorContext = '',
 function buildSystemMessageContext(type = 'ask') {
     switch (type) {
         case 'ask':
-            return `You are an AI assistant. 
-                        Rules: answer clearly, use tools if available, cite context when relevant, admit lack of data.`;
+            return `You are an AI assistant with access to specialized tools and functions.
+                        
+                        Rules: 
+                        - Answer clearly and concisely
+                        - ALWAYS use available tools when they can help answer the user's question
+                        - When a user asks about a specific person, user, or entity by name, USE the appropriate tool to fetch that information
+                        - Cite context when relevant
+                        - Admit lack of data if tools cannot provide the information
+                        - Prioritize tool usage over general knowledge when specific data is requested`;
         default:
             return `You are a helpful AI assistant.`;
     }
