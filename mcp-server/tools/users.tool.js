@@ -1,10 +1,9 @@
-
+import { z } from "zod";
 
 async function registerUsersTool(server) {
     server.tool(
         "get_list_users",
         "Retrieve a list of users",
-        {},
         async (params) => {
             // Logic to get list of users
             const dummyUsers = [
@@ -27,19 +26,12 @@ async function registerUsersTool(server) {
 
     server.tool(
         "get_user_details",
-        "Get detailed information about a specific user by their user ID or name. Returns user information including name, job title, age, and location. Use this tool whenever someone asks about a specific person or user by name.",
+        "Retrieves detailed information about a specific user. ALWAYS use this tool when the user asks for information about ANY person, user, or individual by name or ID. Returns user information including name, job title, age, and location. Examples: 'Tell me about Alice', 'Get Bob's information', 'Who is user1', 'Information on Charlie'.",
         {
-            type: "object",
-            properties: {
-                user_id: {
-                    type: "string",
-                    description: "The user ID or name to look up (e.g., 'user1', 'Alice', 'Bob')"
-                }
-            }
-            
+            keysearch: z.string().min(1).describe("The user ID or name to search for. Can be a name like 'Alice', 'Bob', 'Charlie' or an ID like 'user1', 'user2', 'user3'.")
         },
-        async (params) => {
-            const { user_id } = params;
+        async ({ keysearch }) => {
+            
             // Logic to get user details
             const dummyUsers = [
                 { id: "user1", name: "Alice", job: "Engineer", age: 30, location: "New York" },
@@ -48,11 +40,11 @@ async function registerUsersTool(server) {
             ];
             
             let messageResponse;
-            const user = dummyUsers.find(u => u.id === user_id || u.name?.toLowerCase() === user_id?.toLowerCase());
+            const user = dummyUsers.find(u => u.id === keysearch || u.name.toLowerCase() === keysearch.toLowerCase());
             if (user) {
-                messageResponse = `User Details - ID: ${user.id}, Name: ${user.name}, Job: ${user.job}`;
+                messageResponse = `User Details - ID: ${user.id}, Name: ${user.name}, Job: ${user.job}, Age: ${user.age}, Location: ${user.location}`;
             } else {
-                messageResponse = `User with ID ${user_id} not found. params: ${JSON.stringify(params)}`;
+                messageResponse = `User with ID or name "${keysearch}" not found.`;
             }
 
             return { 

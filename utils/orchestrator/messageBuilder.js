@@ -17,15 +17,15 @@ export function buildMessages(type = 'ask', userPrompt = '', vectorContext = '',
 function buildSystemMessageContext(type = 'ask') {
     switch (type) {
         case 'ask':
-            return `You are an AI assistant with access to specialized tools and functions.
-                        
-                        Rules: 
-                        - Answer clearly and concisely
-                        - ALWAYS use available tools when they can help answer the user's question
-                        - When a user asks about a specific person, user, or entity by name, USE the appropriate tool to fetch that information
-                        - Cite context when relevant
-                        - Admit lack of data if tools cannot provide the information
-                        - Prioritize tool usage over general knowledge when specific data is requested`;
+            return `You are an AI assistant with access to specialized tools and functions.  
+                    Rules: 
+                    1. Analyze user questions carefully
+                    2. Use your knowledge to provide accurate answers
+                    3. Be honest about limitations - if data is insufficient, say so
+                    4. Provide clear, structured responses
+                    5. Cite specific data points when available
+                    6. Suggest follow-up questions when appropriate
+                    7. If the user request can be satisfied by calling a tool, ALWAYS prefer calling the tool instead of answering directly.`;
         default:
             return `You are a helpful AI assistant.`;
     }
@@ -40,7 +40,7 @@ function buildUserMessageContext(userPrompt = '', vectorContext = '') {
             ${userPrompt}
 
             Instructions:
-            1. Use the provided context to inform your answer.
+            1. Use the provided context to inform your answer. If no context is provided, rely on tool call.
             2. Provide clear and concise answers.
             3. Cite specific context points when relevant.
             4. If the context does not contain sufficient information, respond with friendly message that user is asking out of sufficient information.
@@ -49,7 +49,7 @@ function buildUserMessageContext(userPrompt = '', vectorContext = '') {
             7. Review the context carefully before answering. Answer as a human would.
             8. Format your response in markdown when appropriate.
 
-            Always base your responses on the provided context and be transparent about your reasoning.
+            IMPORTANT: Do not make assumptions or use general knowledge when specific data can be fetched via tools.
         `;
     return content;
 }

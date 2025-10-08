@@ -36,7 +36,8 @@ async function *createChatCompletionStream(prompt, options = {}) {
         model: 'gpt-4',
         messages: message,
         stream: true,
-        tools: toolCalls
+        tools: toolCalls,
+        tool_choice: 'auto' // Explicitly set to auto to encourage tool usage
     });
 
     // Collect token usage

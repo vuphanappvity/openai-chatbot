@@ -34,18 +34,36 @@ async function connectLocalMCPServer() {
 
 async function getTools(name = []) {
     const response = await client.listTools();
-    if (name.length === 0) {
-        return response.tools;
-    }
-    return response.tools.filter(tool => name.includes(tool.name));
+    
+    const tools = name.length === 0 ? response.tools : response.tools.filter(tool => name.includes(tool.name));
+    
+    // Transform MCP tool format to OpenAI function calling format if needed
+    return tools.map(tool => {
+        // If inputSchema exists, use it as parameters; otherwise keep original
+        if (tool.inputSchema) {
+            return {
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.inputSchema
+            };
+        }
+        return tool;
+    });
 }
 
 async function callTool(toolName, parameters = {}) {
-    const response = await client.callTool({
-        name: toolName,
-        arguments: parameters,
-    });
-    return response;
+    
+    try {
+        const response = await client.callTool({
+            name: toolName,
+            arguments: parameters,
+        });
+        
+        return response;
+    } catch (error) {
+        console.error("Error calling tool:", error);
+        throw error;
+    }
 }
 
 export { connectLocalMCPServer, getTools, callTool };
