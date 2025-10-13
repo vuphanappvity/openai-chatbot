@@ -1,109 +1,68 @@
 import { OpenAI } from 'openai';
 import { OPENAI_API_KEY } from '../../configs/openai.js';
 import { analyzePrompt } from './promptAnalyzer.js';
-import { getVectorContext } from '../vector/vectorStore.js';
-import { buildMessages } from '../../utils/orchestrator/messageBuilder.js';
+import { buildSystemMessageContext } from '../../utils/orchestrator/messageBuilder.js';
 import { callTool, getTools } from '../mcp/client.js';
 
 const openai = new OpenAI({
-    apiKey: OPENAI_API_KEY,
+	apiKey: OPENAI_API_KEY,
 });
 
-async function *createChatCompletionStream(prompt, options = {}) {
-    let tokenUsage = 0;
-    
-    // Translate prompt if necessary
-    const { translatedPrompt } = await analyzePrompt(prompt);
+async function* createChatCompletionStream(prompt, options = {}) {
+	let tokenUsage = 0;
 
-    // Get vector context
-    const context = await getVectorContext(translatedPrompt);
-    
-    // Build messages
-    const message = buildMessages('ask', translatedPrompt, context, []);
+	// Define tool calls
+	const tools = await getTools(options.tools || []);
 
-    // Define tool calls
-    const tools = await getTools(options.tools || []);
-    const toolCalls = tools.map(tool => ({
-        type: 'function',
-        function: {
-            name: tool.name,
-            description: tool.description,
-            parameters: tool.parameters,
+	const analyzed = await analyzePrompt(prompt, options, tools);
+
+	if (analyzed.intent === 'none') {
+		// No tool to call, response no resource found
+		const message = `I'm sorry, but I couldn't find any relevant information to assist with your request. Could you please provide more details or clarify your question?`;
+		const response = message.split(' ');
+		for (const word of response) {
+			yield word + ' ';
+		}
+		return;
+	}
+
+	const toolResult = await callTool(analyzed.tool, { ...analyzed.parameters, userId: options.userId || null, workspace: options.workspace || null });
+    const toolContent = toolResult.content?.[0].text || '';
+
+	//Follow-up call to get response after tool execution
+	const completionMessage = [
+        {
+            role: 'system',
+            content: buildSystemMessageContext('ask')
+        },
+        {
+            role: 'user',
+            content: `Workspace: ${options.workspace || 'N/A'}, User: ${options.userId || 'N/A'}, Prompt: ${prompt}`
+        },
+        {
+            role: 'assistant',
+            content: `Tool ${analyzed.tool} was called and returned the following result: ${toolContent}. Please use this information to answer the user's original question: "${prompt}".`
+        },
+        {
+            role: 'user',
+            content: `Summarize the above information and provide a clear, concise response to the user's original question. If the tool result does not contain relevant information, politely inform the user that no relevant data was found.`
         }
-    }));
+    ] 
+	const followUpResponse = await openai.chat.completions.create({
+		model: 'gpt-4',
+		messages: completionMessage,
+		stream: true,
+	});
 
-    const response = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: message,
-        stream: true,
-        tools: toolCalls,
-        tool_choice: 'auto' // Explicitly set to auto to encourage tool usage
-    });
+	for await (const chunk of followUpResponse) {
+		const delta = chunk.choices[0].delta;
+		const content = delta.content;
+		if (content) {
+			yield content;
+		}
+	}
 
-    // Collect token usage
-    tokenUsage += response.usage?.total_tokens || 0;
-
-
-    // Detect and handle tool calls
-    let toolCallDetected = null;
-    let accumulatedToolCall = { function: { name: '', arguments: '' }, id: '' };
-    
-    for await (const chunk of response) {
-        const delta = chunk.choices[0].delta;
-
-        if (delta.tool_calls) {
-            // Accumulate tool call data from streaming chunks
-            const toolCallDelta = delta.tool_calls[0];
-            if (toolCallDelta.id) {
-                accumulatedToolCall.id = toolCallDelta.id;
-            }
-            if (toolCallDelta.function?.name) {
-                accumulatedToolCall.function.name += toolCallDelta.function.name;
-            }
-            if (toolCallDelta.function?.arguments) {
-                accumulatedToolCall.function.arguments += toolCallDelta.function.arguments;
-            }
-            toolCallDetected = true;
-            continue; // Skip yielding tool call chunks
-        }
-
-        const content = delta.content;
-        if (content) {
-            // Response content chunk without tool call
-            yield content;
-        }
-    }
-
-    if (toolCallDetected) {
-        // Parse the accumulated arguments JSON string
-        const toolArgs = JSON.parse(accumulatedToolCall.function.arguments);
-        const toolResult = await callTool(accumulatedToolCall.function.name, toolArgs);
-
-        //Follow-up call to get response after tool execution
-        const followUpMessages = buildMessages('ask', translatedPrompt, context, [{ 
-            id: accumulatedToolCall.id,
-            type: 'function',
-            function: accumulatedToolCall.function,
-            toolCallResponse: toolResult 
-        }]);
-        const followUpResponse = await openai.chat.completions.create({
-            model: 'gpt-4',
-            messages: followUpMessages,
-            stream: true,
-        });
-
-        for await (const chunk of followUpResponse) {
-            const delta = chunk.choices[0].delta;
-            const content = delta.content;
-            if (content) {
-                yield content;
-            }
-        }
-
-        tokenUsage += followUpResponse.usage?.total_tokens || 0;
-    }
-
-    console.info(`Total tokens used: ${tokenUsage}`);
+	tokenUsage += followUpResponse.usage?.total_tokens || 0;
 }
 
 export { createChatCompletionStream };

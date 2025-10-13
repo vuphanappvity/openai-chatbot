@@ -11,15 +11,14 @@ async function registerUsersTool(server) {
                 { id: "user2", name: "Bob" },
                 { id: "user3", name: "Charlie" }
             ];
-            const messageResponse = `List of users: ${dummyUsers.map(user => user.name).join(', ')}`;
 
             return { 
                 content: [
                     {
-                        type: "text",
-                        text: messageResponse,
+                        type: 'text',
+						text: JSON.stringify(dummyUsers, null, 2),
                     }
-                ] 
+                ]
             };
         }
     );
@@ -38,22 +37,16 @@ async function registerUsersTool(server) {
                 { id: "user2", name: "Bob", job: "Designer", age: 25, location: "San Francisco" },
                 { id: "user3", name: "Charlie", job: "Manager", age: 35, location: "Chicago" }
             ];
-            
-            let messageResponse;
-            const user = dummyUsers.find(u => u.id === keysearch || u.name.toLowerCase() === keysearch.toLowerCase());
-            if (user) {
-                messageResponse = `User Details - ID: ${user.id}, Name: ${user.name}, Job: ${user.job}, Age: ${user.age}, Location: ${user.location}`;
-            } else {
-                messageResponse = `User with ID or name "${keysearch}" not found.`;
-            }
+
+            const dataResult = dummyUsers.find(u => u.id === keysearch || u.name.toLowerCase() === keysearch.toLowerCase());
 
             return { 
                 content: [
                     {
-                        type: "text",
-                        text: messageResponse,
+                        type: 'text',
+                        text: JSON.stringify(dataResult || { error: "User not found" }, null, 2),
                     }
-                ] 
+                ]
             };
         }
     );

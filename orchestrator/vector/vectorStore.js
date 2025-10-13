@@ -5,12 +5,11 @@ const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
-export async function getVectorContext(prompt) {
+async function getVectorContext(prompt) {
   if (!VECTOR_STORE_ID) {
-    return "";
+    return [];
   }
   try {
-
     const vectorStore = await openai.vectorStores.search(VECTOR_STORE_ID, {
       query: prompt,
       max_num_results: 5,
@@ -26,28 +25,11 @@ export async function getVectorContext(prompt) {
       return acc;
     }, []);
 
-    const summary = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an AI assistant that summarizes context information into concise key points.",
-        },
-        {
-          role: "user",
-          content: `Summarize the following context information into concise key points:\n\n${results.join(
-            "\n\n"
-          )}`,
-        },
-      ],
-      max_tokens: 150,
-      temperature: 0.5,
-    });
-
-    return summary.choices[0].message.content.trim();
+    return results;
   } catch (error) {
     console.error("Failed to initialize OpenAI Vector Store:", error);
     throw error;
   }
 }
+
+export { getVectorContext };

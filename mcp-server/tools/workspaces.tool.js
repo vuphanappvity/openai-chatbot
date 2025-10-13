@@ -12,15 +12,14 @@ function registerWorkspacesTool(server) {
                 { id: "sra", name: "SRA" },
                 { id: "portal", name: "Portal" }
             ];
-            const messageResponse = `List of workspaces: ${dummyWorkspaces.map(ws => ws.name).join(', ')}`;
 
             return { 
                 content: [
                     {
-                        type: "text",
-                        text: messageResponse,
+                        type: 'text',
+                        text: JSON.stringify(dummyWorkspaces, null, 2),
                     }
-                ] 
+                ]
             };
         }
     );
@@ -38,20 +37,15 @@ function registerWorkspacesTool(server) {
                 { id: "portal", name: "Portal" }
             ];
             
-            let messageResponse;
-            if (dummyWorkspaces.find(ws => ws.id === workspace_id || ws.name.toLowerCase() === workspace_id.toLowerCase())) {
-                messageResponse = `Workspace Details - ID: ${workspace.id}, Name: ${workspace.name}`;
-            } else {
-                messageResponse = `Workspace with ID ${workspace_id} not found.`;
-            }
+            const dataResult = dummyWorkspaces.find(ws => ws.id === workspace_id || ws.name.toLowerCase() === workspace_id.toLowerCase());
 
             return { 
                 content: [
                     {
-                        type: "text",
-                        text: messageResponse,
+                        type: 'text',
+                        text: JSON.stringify(dataResult || { error: "Workspace not found" }, null, 2),
                     }
-                ] 
+                ]
             };
         }
     );
