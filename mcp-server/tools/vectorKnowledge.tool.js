@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { getVectorContext } from '../../orchestrator/vector/vectorStore.js';
+import { queryDocs } from '../../data/embeddings/queryDocs.js';
+// import { getVectorContext } from '../../orchestrator/vector/vectorStore.js';
 
 async function registerVectorKnowledgeTool(server) {
 	server.tool(
@@ -18,7 +19,12 @@ async function registerVectorKnowledgeTool(server) {
 		},
 		async ({ query, userId, workspace }) => {
 			// Logic to get vector knowledge
-			const context = await getVectorContext(query);
+			// const context = await getVectorContext(query);
+			const response = await queryDocs(query, 5, { }); // apply filter later
+			const context = response.results.reduce((acc, item) => {
+				acc.push(item.content);
+				return acc;
+			}, []);
 
 			return {
 				content: [

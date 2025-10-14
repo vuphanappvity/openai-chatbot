@@ -30,42 +30,88 @@ This is an intelligent chatbot service built with OpenAI's GPT models, integrate
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Express Server                       │
-│                    (HTTP API Endpoint)                      │
-└───────────────────────────────┬─────────────────────────────┘
-                                │
-                    ┌───────────┴───────────────┐
-                    │                           │
-                    ▼                           ▼
-            ┌──────────────────┐      ┌──────────────────┐
-            │  OpenAI GPT-4    │      │   MCP Server     │
-            │  Orchestrator    │◄────►│  (Tool Registry) │
-            └──────────────────┘      └──────────────────┘
-                    │                           │
-                    │                  ┌────────┴────────┐
-                    │                  │                 │
-                    ▼                  ▼                 ▼
-            ┌──────────────────┐  ┌──────────┐  ┌──────────────┐
-            │    ChromaDB      │  │  Users   │  │  Workspaces  │
-            │ (Vector Store)   │  │   Tool   │  │     Tool     │
-            └──────────────────┘  └──────────┘  └──────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    LLM Orchestrator (OpenAI)                    │
+│                                                                 │
+│    ┌─────────────────────────────────────────────────────┐      │
+│    │                   MCP Client                        │      │
+│    └─────────────────────────────────────────────────────┘      │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │     MCP Server       │
+                    │   (Tool Registry)    │
+                    └──────────┬───────────┘
+                               │
+          ┌────────────────────┼────────────────────┬──────────────┐
+          │                    │                    │              │
+          ▼                    ▼                    ▼              ▼
+    ┌──────────┐         ┌──────────┐        ┌──────────┐   ┌──────────┐
+    │Workspace │         │   User   │        │  Other   │   │  Vector  │
+    │   Tool   │         │   Tool   │        │   Tool   │   │   Tool   │
+    └────┬─────┘         └────┬─────┘        └────┬─────┘   └────┬─────┘
+         │                    │                   │              │ 
+         ▼                    ▼                   ▼              ▼
+    ┌──────────┐         ┌──────────┐        ┌──────────┐    ┌──────────┐
+    │   API    │         │   API    │        │   API    │    │  Vector  │
+    │Connection│         │Connection│        │Connection│    │ Database │
+    └──────────┘         └──────────┘        └──────────┘    │(ChromaDB)│
+                                                             └──────────┘
 ```
 
 ### Component Flow
-1. **HTTP Request** → Express server receives user prompt
+1. **User Request** → Client sends prompt to the LLM Orchestrator (OpenAI)
 2. **Prompt Analysis** → Orchestrator analyzes intent and determines required tools
-3. **Tool Execution** → MCP client calls appropriate tools via MCP server
-4. **Context Building** → Results combined with vector knowledge base
-5. **Response Generation** → OpenAI generates response with full context
-6. **Streaming** → Response streamed back to client via SSE
+3. **MCP Client** → Routes tool requests through Model Context Protocol client
+4. **MCP Server** → Central tool registry that manages and dispatches tool calls
+5. **Tool Execution** → Individual tools execute their specific operations:
+   - **Workspace Tool** → Manages workspace data via API connection
+   - **User Tool** → Handles user information via API connection
+   - **Vector Tool** → Performs semantic search in ChromaDB Vector Database
+   - **Other Tools** → Additional custom tools with their API connections
+6. **Response Aggregation** → Tool results are returned to the MCP Server
+7. **Context Building** → MCP Client combines results and sends to Orchestrator
+8. **Response Generation** → OpenAI generates final response with full context
+9. **Streaming** → Response streamed back to client via SSE
+
+### Key Components
+
+#### LLM Orchestrator (OpenAI)
+- **MCP Client Integration**: Embedded client that communicates with MCP Server
+- **Intelligent Routing**: Analyzes prompts and determines which tools to invoke
+- **Response Generation**: Creates natural language responses using GPT-4
+- **Streaming Support**: Real-time response streaming to end users
+
+#### MCP Server
+- **Tool Registry**: Central hub for all available tools
+- **Request Routing**: Dispatches tool calls to appropriate handlers
+- **Protocol Implementation**: Implements Model Context Protocol standard
+- **Extensibility**: Easy addition of new tools without modifying core logic
+
+#### Tools Layer
+Each tool provides specific capabilities:
+- **Workspace Tool**: Access and manage workspace configurations and settings
+- **User Tool**: Retrieve and update user profiles and preferences
+- **Vector Tool**: Semantic search across knowledge base using embeddings
+- **Custom Tools**: Extensible architecture allows for unlimited tool additions
+
+#### Data Layer
+- **API Connections**: RESTful APIs for workspace, user, and other services
+- **Vector Database**: ChromaDB for efficient similarity search and RAG
+- **Persistent Storage**: Maintains embeddings and metadata for knowledge retrieval
 
 ## 📦 Prerequisites
 
-- **Node.js**: v18.0.0 or higher
+- **Node.js**: v18.0.0 or higher (ES Modules support required)
 - **npm**: v9.0.0 or higher
-- **ChromaDB Server**: Running instance (local or remote)
-- **OpenAI API Key**: Valid API key with GPT-4 access
+- **ChromaDB Server**: Running instance (local or remote) on port 8000
+- **OpenAI API Key**: Valid API key with access to:
+  - GPT-4 models (or gpt-4o-mini)
+  - Embedding models (text-embedding-3-small)
+- **Operating System**: 
+  - Windows: May require Visual C++ Redistributables (if using default ChromaDB embeddings)
+  - Linux/macOS: Native support
 
 ## 🚀 Installation
 
@@ -80,18 +126,22 @@ cd openai-chatbot
 npm install
 ```
 
-### 3. Setup ChromaDB Server
-
-#### Option A: Using Docker
-```bash
-docker pull chromadb/chroma
-docker run -p 8000:8000 chromadb/chroma
+**Key Dependencies:**
+- `express`: ^5.1.0 - Web framework
+- `openai`: ^6.0.0 - OpenAI API client
+- `chromadb`: ^3.0.17 - Vector database client
+- `@modelcontextprotocol/sdk`: ^1.18.2 - MCP protocol implementation
+- `tiktoken`: ^1.0.22 - Token counting for OpenAI models
+- Additional: cors, helmet, dotenv
+npm install
 ```
 
-#### Option B: Using Python
+### 3. Setup ChromaDB Server
+
+#### Using Docker
 ```bash
-pip install chromadb
-chroma run --host localhost --port 8000
+docker pull chromadb/chroma
+docker run -p 8000:8000 chromadb/chroma --name agentic-chroma
 ```
 
 ## ⚙️ Configuration
@@ -119,20 +169,23 @@ APP_DOMAIN=localhost
 APP_NAME=AI CHATBOT SERVICE
 APP_VERSION=1.0.1
 APP_ENV=dev  # dev, qa, stage, prod
-URL_DOMAIN=http://localhost:3000
+URL_DOMAIN=http://localhost:8300
 
 # Request Settings
 MAX_REQUEST_BODY_SIZE=50mb
 
 # OpenAI Configuration
 OPENAI_API_KEY=sk-your-api-key-here
-OPENAI_MODEL=gpt-4
-VECTOR_STORE_ID=your-vector-store-id
+OPENAI_MODEL=gpt-4o-mini  # or gpt-4, gpt-4-turbo
+EMBEDDING_MODEL=text-embedding-3-small  # or text-embedding-ada-002
+MAX_TOKENS=1000
+TEMPERATURE=0.7
+VECTOR_STORE_ID=your-vector-store-id  # Optional
 
 # ChromaDB Configuration
 CHROMA_SERVER_HOST=localhost
 CHROMA_SERVER_PORT=8000
-COLLECTION_NAME=360-knowledge-base
+COLLECTION_NAME=360_docs  # Collection name for ChromaDB
 ```
 
 ### 2. Configuration Files
@@ -209,14 +262,25 @@ Main HTTP server that:
 - Handles CORS and security (Helmet)
 - Manages body parsing for multiple content types
 - Provides `/api/chatbot/ask` endpoint
-- Connects to MCP server on startup
-- Implements graceful shutdown
+- **Automatically starts MCP server** on startup (imports `mcp-server/server.js`)
+- **Automatically generates vectors** on startup (imports `data/generateVectors.js`)
+- Connects MCP client to MCP server
+- Implements graceful shutdown on SIGINT
 
 **Key Features:**
-- Server-Sent Events (SSE) for streaming responses
-- Request validation
-- Error handling
-- MCP client initialization
+- Server-Sent Events (SSE) for streaming responses with JSON format
+- Request validation (requires `prompt` in body)
+- Comprehensive error handling
+- MCP client initialization and connection
+- Auto-generation of embeddings from documents
+
+**Startup Sequence:**
+1. Load environment variables
+2. Start MCP server (via import)
+3. Generate/update vectors (via import)
+4. Start HTTP server
+5. Connect MCP client to server
+6. Ready to accept requests
 
 ### 2. OpenAI Orchestrator (`orchestrator/openai/orchestrator.js`)
 
@@ -272,39 +336,55 @@ Connects to MCP server:
 ### 6. Vector Store (`data/db.js`)
 
 ChromaDB operations:
-- Collection management
-- Batch embedding storage
-- Similarity search
-- Backup and restore functionality
-- Error handling and retries
+- Collection management with custom embedding function handling
+- Batch embedding storage (batch size: 100)
+- Similarity search with filtering
+- Collection info and deletion utilities
+- Uses `embeddingFunction: null` to provide pre-computed embeddings from OpenAI
 
 **Key Functions:**
 ```javascript
-// Save embeddings to ChromaDB
+// Save pre-computed embeddings to ChromaDB
 saveEmbeddings(embeddings)
 
-// Query similar documents
-queryCollection(queryEmbeddings, options)
+// Query using pre-computed embeddings
+queryEmbeddings(queryEmbedding, topK, filters)
 
-// Backup collection
-backupCollection()
+// Get collection information
+getCollectionInfo()
 
-// Restore from backup
-restoreCollection(backupFilePath)
+// Delete collection (for cleanup/reset)
+deleteCollection()
 ```
+
+**Important:** This project uses OpenAI's `text-embedding-3-small` for generating embeddings, not ChromaDB's default embedding function. This avoids dependency issues and provides higher quality embeddings.
 
 ### 7. Embeddings Management
 
 #### `data/embeddings/embedDocs.js`
 - Reads documents from `data/docs/`
-- Chunks text into manageable pieces
-- Generates embeddings using OpenAI
-- Stores in ChromaDB
+- Chunks text into manageable pieces using `data/utils/chunkText.js`
+- Generates embeddings using OpenAI's embedding model
+- Returns embeddings ready for ChromaDB storage
 
 #### `data/embeddings/queryDocs.js`
 - Queries vector store for similar content
-- Returns relevant document chunks
+- Returns relevant document chunks with metadata
 - Used for RAG (Retrieval Augmented Generation)
+
+#### `data/generateVectors.js`
+- Script to generate and save vectors from markdown documents
+- Automatically runs on application startup
+- Handles collection backup and restoration
+- Processes all `.md` files in `data/docs/` folder
+
+### 8. Text Chunking (`data/utils/chunkText.js`)
+
+Intelligent text chunking for embeddings:
+- Token-based chunking (default: 650 tokens per chunk)
+- Overlap between chunks (default: 75 tokens)
+- Preserves sentence boundaries
+- Optimizes for embedding model context windows
 
 ## 🌐 API Documentation
 
@@ -349,22 +429,26 @@ Connection: keep-alive
 
 **Body:** Server-Sent Events stream
 ```
-data: The 
+data: {"content":"The "}
 
-data: 360 
+data: {"content":"360 "}
 
-data: Portal 
+data: {"content":"Portal "}
 
-data: is 
+data: {"content":"is "}
 
-data: a 
-
-data: comprehensive 
+data: {"content":"a "}
 
 ...
 
-data: [DONE]
+data: {"done":true}
 ```
+
+**Response Format:**
+Each data event contains a JSON object:
+- During streaming: `{"content": "word "}`
+- On completion: `{"done": true}`
+- On error: `{"error": "error message"}`
 
 #### Example Usage
 
@@ -409,9 +493,18 @@ while (true) {
   
   for (const line of lines) {
     if (line.startsWith('data: ')) {
-      const content = line.slice(6);
-      if (content !== '[DONE]') {
-        console.log(content);
+      const jsonStr = line.slice(6);
+      try {
+        const data = JSON.parse(jsonStr);
+        if (data.done) {
+          console.log('Stream completed');
+        } else if (data.content) {
+          process.stdout.write(data.content);
+        } else if (data.error) {
+          console.error('Error:', data.error);
+        }
+      } catch (e) {
+        // Skip invalid JSON
       }
     }
   }
@@ -440,18 +533,30 @@ while (true) {
 
 #### Development Mode
 ```bash
-npm start
-```
-
-Or with Node.js directly:
-```bash
 node app/index.js
 ```
+
+**Note:** The application automatically:
+- Starts the MCP server
+- Generates vectors from documents in `data/docs/` (if not already done)
+- Connects MCP client to MCP server
+- Starts the HTTP server on the configured port
 
 #### Watch Mode (with nodemon)
 ```bash
 npm install -g nodemon
 nodemon app/index.js
+```
+
+#### Important Startup Behavior
+The app imports `data/generateVectors.js` on startup, which:
+- Checks for existing vector collections
+- Generates embeddings if needed
+- Creates backups automatically
+
+To skip automatic vector generation, comment out this line in `app/index.js`:
+```javascript
+// import '../data/generateVectors.js';
 ```
 
 ### Adding a New MCP Tool
@@ -519,10 +624,24 @@ registerMyNewTool(server);
 echo "# My Document\nContent here..." > data/docs/myDoc.md
 ```
 
-2. **Generate embeddings**:
+2. **Generate embeddings** (two options):
+
+**Option A: Restart the application** (automatic generation):
 ```bash
-node data/embeddings/embedDocs.js
+node app/index.js
 ```
+
+**Option B: Run the generation script** manually:
+```bash
+node data/generateVectors.js
+```
+
+This script will:
+- Read all `.md` files from `data/docs/`
+- Delete existing collection (if any)
+- Generate embeddings using OpenAI
+- Save to ChromaDB
+- Create automatic backup in `data/chroma/`
 
 3. **Verify** embeddings were created:
 ```bash
@@ -532,23 +651,30 @@ node data/embeddings/queryDocs.js
 #### Querying the Knowledge Base
 
 ```javascript
-import { queryCollection } from './data/db.js';
+import { queryEmbeddings } from './data/db.js';
 import { OpenAI } from 'openai';
+import { OPENAI_API_KEY, EMBEDDING_MODEL } from './configs/openai.js';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // Generate query embedding
 const embedding = await openai.embeddings.create({
-    model: 'text-embedding-ada-002',
+    model: EMBEDDING_MODEL, // 'text-embedding-3-small'
     input: 'Your query here'
 });
 
-// Search for similar documents
-const results = await queryCollection(
+// Search for similar documents with filters
+const results = await queryEmbeddings(
     embedding.data[0].embedding,
-    { nResults: 5 }
+    5, // topK
+    { 
+        workspace: '360',
+        type: 'Portal'
+    }
 );
 
+console.log(results);
+```
 console.log(results);
 ```
 
@@ -649,51 +775,64 @@ ChromaDB stores document embeddings for semantic search:
 
 ### Document Processing Pipeline
 
-1. **Read Documents** → Load from `data/docs/`
-2. **Chunk Text** → Split into ~500 token chunks (using `data/utils/chunkText.js`)
-3. **Generate Embeddings** → Create vectors with OpenAI
-4. **Store in ChromaDB** → Save with metadata
-5. **Query** → Retrieve relevant chunks by similarity
+1. **Read Documents** → Load all `.md` files from `data/docs/`
+2. **Parse Metadata** → Extract workspace and type from filename (e.g., `360_Portal.md` → workspace: "360", type: "Portal")
+3. **Chunk Text** → Split into ~650 token chunks with 75-token overlap (using `data/utils/chunkText.js`)
+4. **Generate Embeddings** → Create vectors with OpenAI's `text-embedding-3-small` model
+5. **Store in ChromaDB** → Save embeddings with metadata to collection
+6. **Auto Backup** → Automatically creates backup after successful generation
 
 ### Chunking Strategy
 
 Located in `data/utils/chunkText.js`:
 
-- **Chunk Size:** 500 tokens (adjustable)
-- **Overlap:** 50 tokens (prevents context loss)
-- **Splitting:** Sentence-aware splitting
-- **Preservation:** Code blocks and formatting maintained
+- **Chunk Size:** 650 tokens (configurable, optimized for embedding model)
+- **Overlap:** 75 tokens (prevents context loss between chunks)
+- **Splitting:** Sentence-aware splitting for semantic coherence
+- **Preservation:** Maintains code blocks and formatting
+- **Token Counting:** Uses `tiktoken` library for accurate token counting
 
 ### Backup and Restore
 
-#### Backup Collection
-```bash
-node data/db.js backup
-```
+Backups are **automatically created** after running `node data/generateVectors.js`.
 
-Creates timestamped backup in `data/chroma/`:
-- `chromadb-backup-YYYY-MM-DDTHH-mm-ss-SSSZ.json`
-- `latest-backup.json` (symlink)
+**Manual Backup:**
+The `generateVectors.js` script automatically backs up collections to:
+- `data/chroma/chromadb-backup-YYYY-MM-DDTHH-mm-ss-SSSZ.json` (timestamped)
+- `data/chroma/latest-backup.json` (always points to latest)
 
-#### Restore Collection
-```bash
-node data/db.js restore data/chroma/latest-backup.json
-```
+**Backup includes:**
+- Collection metadata
+- All document IDs
+- All embeddings
+- All metadata
+- All document texts
 
 ### Performance Tuning
 
 **Batch Size:**
 ```javascript
-const BATCH_SIZE = 100; // In data/db.js
+const BATCH_SIZE = 100; // In data/db.js - controls batch processing
 ```
 
 **Query Parameters:**
 ```javascript
-const results = await queryCollection(embedding, {
-    nResults: 10,        // Number of results
-    whereDocument: {},   // Metadata filters
-    include: ['documents', 'metadatas', 'distances']
-});
+const results = await queryEmbeddings(
+    queryEmbedding,
+    10,  // topK - Number of results to return
+    {
+        workspace: '360',  // Optional filter by workspace
+        type: 'Portal',    // Optional filter by type
+        title: '360_Portal' // Optional filter by title
+    }
+);
+```
+
+**Embedding Model Configuration:**
+```javascript
+// In configs/openai.js
+EMBEDDING_MODEL = 'text-embedding-3-small'  // Fast and cost-effective
+// Alternative: 'text-embedding-ada-002' or 'text-embedding-3-large'
 ```
 
 ## 🧪 Testing
@@ -896,10 +1035,37 @@ OpenAI API Error: 401 Unauthorized
 
 **Solution:**
 - Verify `OPENAI_API_KEY` is valid and active
-- Check API key has GPT-4 access
+- Check API key has access to the configured model (`gpt-4o-mini` or `gpt-4`)
 - Ensure no rate limits exceeded
+- Verify embedding model is accessible (`text-embedding-3-small`)
 
-#### 4. Streaming Response Not Working
+#### 4. ChromaDB Embedding Function Error
+
+**Error:**
+```
+Error: A dynamic link library (DLL) initialization routine failed.
+onnxruntime_binding.node
+Cannot instantiate a collection with the DefaultEmbeddingFunction
+```
+
+**Solution:**
+This project uses **pre-computed embeddings from OpenAI**, not ChromaDB's default embedding function. The `db.js` file should have `embeddingFunction: null` when creating collections.
+
+**Check `data/db.js`:**
+```javascript
+const collection = await chromaClient.createCollection({ 
+    name: COLLECTION_NAME,
+    embeddingFunction: null  // Must be null
+});
+```
+
+**Benefits of this approach:**
+- ✅ Avoids onnxruntime dependency issues on Windows
+- ✅ Higher quality embeddings from OpenAI
+- ✅ No DLL/native module compilation required
+- ✅ Consistent embeddings across all operations
+
+#### 5. Streaming Response Not Working
 
 **Error:**
 Client receives no data or incomplete response
@@ -907,10 +1073,12 @@ Client receives no data or incomplete response
 **Solution:**
 - Check client supports Server-Sent Events (SSE)
 - Verify `Content-Type: text/event-stream` header is set
+- Parse JSON from each `data:` line (format: `{"content": "word"}`)
 - Ensure no reverse proxy buffering responses
 - Check for timeout settings on intermediary services
+- Look for `X-Accel-Buffering: no` header
 
-#### 5. High Token Usage
+#### 6. High Token Usage
 
 **Issue:**
 Unexpectedly high OpenAI API costs

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import '../mcp-server/server.js'; // Ensure MCP server starts
+import '../data/generateVectors.js'; // Ensure vectors are generated on startup
 import { connectLocalMCPServer } from '../orchestrator/mcp/client.js';
 import { createChatCompletionStream } from '../orchestrator/openai/orchestrator.js';
 import { HOST_PORT, HOSTNAME, APP_ENV, APP_NAME } from '../configs/global.js';

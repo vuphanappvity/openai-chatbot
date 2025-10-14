@@ -1,14 +1,16 @@
 // Database management using ChromaDB
 import { ChromaClient } from 'chromadb';
-import fs from 'fs';
-import path from 'path';
 import {
     CHROMA_SERVER_HOST,
     CHROMA_SERVER_PORT,
     COLLECTION_NAME
 } from '../configs/openai.js';
+// import { DefaultEmbeddingFunction } from '@chroma-core/default-embed';
 
 const BATCH_SIZE = 100;
+
+// Custom embedding function that does nothing (we provide pre-computed embeddings)
+// const embedder = new DefaultEmbeddingFunction();
 
 // Configure ChromaClient for server mode
 const chromaClient = new ChromaClient({
@@ -28,7 +30,11 @@ async function getOrCreateCollection() {
     } catch (error) {
         // If collection doesn't exist, create it
         console.log(`Creating new collection: ${COLLECTION_NAME}`);
-        const collection = await chromaClient.createCollection({ name: COLLECTION_NAME });
+        // Use NoOp embedding function since we're providing pre-computed embeddings from OpenAI
+        const collection = await chromaClient.createCollection({ 
+            name: COLLECTION_NAME,
+            embeddingFunction: null
+        });
         console.log(`Created collection: ${COLLECTION_NAME}`);
         return collection;
     }
