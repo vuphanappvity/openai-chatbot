@@ -1,20 +1,24 @@
 # OpenAI Chatbot - Developer Documentation
 
 ## 📋 Table of Contents
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Project Structure](#project-structure)
-- [Core Components](#core-components)
-- [API Documentation](#api-documentation)
-- [Development Guide](#development-guide)
-- [MCP Server](#mcp-server)
-- [Vector Store & Embeddings](#vector-store--embeddings)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Troubleshooting](#troubleshooting)
+- [Overview](#-overview)
+- [Architecture](#️-architecture)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+- [Configuration](#️-configuration)
+- [Project Structure](#-project-structure)
+- [Core Components](#-core-components)
+- [API Documentation](#-api-documentation)
+- [Development Guide](#-development-guide)
+- [MCP Server](#️-mcp-server)
+- [Vector Store & Embeddings](#-vector-store--embeddings)
+- [Testing](#-testing)
+- [Deployment](#-deployment)
+- [Troubleshooting](#-troubleshooting)
+- [Additional Resources](#-additional-resources)
+- [License](#-license)
+- [Contributing](#-contributing)
+- [Support](#-support)
 
 ## 🔍 Overview
 
@@ -117,7 +121,7 @@ Each tool provides specific capabilities:
 
 ### 1. Clone the Repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/hai15021999/openai-chatbot.git
 cd openai-chatbot
 ```
 
