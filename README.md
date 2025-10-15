@@ -1,4 +1,4 @@
-# OpenAI Chatbot - Developer Documentation
+# OpenAI Chatbot - Developer Documentations
 
 ## 📋 Table of Contents
 - [Overview](#-overview)
