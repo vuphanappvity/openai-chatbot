@@ -34,70 +34,155 @@ This is an intelligent chatbot service built with OpenAI's GPT models, integrate
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    LLM Orchestrator (OpenAI)                    │
-│                                                                 │
-│    ┌─────────────────────────────────────────────────────┐      │
-│    │                   MCP Client                        │      │
-│    └─────────────────────────────────────────────────────┘      │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │     MCP Server       │
-                    │   (Tool Registry)    │
-                    └──────────┬───────────┘
-                               │
-          ┌────────────────────┼────────────────────┬──────────────┐
-          │                    │                    │              │
-          ▼                    ▼                    ▼              ▼
-    ┌──────────┐         ┌──────────┐        ┌──────────┐   ┌──────────┐
-    │Workspace │         │   User   │        │  Other   │   │  Vector  │
-    │   Tool   │         │   Tool   │        │   Tool   │   │   Tool   │
-    └────┬─────┘         └────┬─────┘        └────┬─────┘   └────┬─────┘
-         │                    │                   │              │ 
-         ▼                    ▼                   ▼              ▼
-    ┌──────────┐         ┌──────────┐        ┌──────────┐    ┌──────────┐
-    │   API    │         │   API    │        │   API    │    │  Vector  │
-    │Connection│         │Connection│        │Connection│    │ Database │
-    └──────────┘         └──────────┘        └──────────┘    │(ChromaDB)│
-                                                             └──────────┘
+                              ┌─────────────────────┐
+                              │   User Request      │
+                              │   (HTTP POST)       │
+                              └──────────┬──────────┘
+                                         │
+                                         ▼
+        ╔═══════════════════════════════════════════════════════════════╗
+        ║              PHASE 1: Intent Analysis (Cheap Model)           ║
+        ╚═══════════════════════════════════════════════════════════════╝
+                                         │
+                    ┌────────────────────┴────────────────────┐
+                    │   Prompt Analyzer (gpt-4o-mini)         │
+                    │   • Analyze user intent                 │
+                    │   • Detect required tool                │
+                    │   • Extract parameters                  │
+                    └────────────────────┬────────────────────┘
+                                         │
+                        ┌────────────────┴─────────────────┐
+                        │  Tool Detected?                  │
+                        └────┬─────────────────────────┬───┘
+                             │ No                      │ Yes
+                             ▼                         ▼
+                    ┌────────────────┐        ┌────────────────┐
+                    │ Fallback to    │        │ Selected Tool  │
+                    │vectorKnowledge │        │ (workspaces,   │
+                    │     Tool       │        │ users, etc.)   │
+                    └────────┬───────┘        └────────┬───────┘
+                             │                         │
+                             └────────────┬────────────┘
+                                          │
+        ╔═══════════════════════════════════════════════════════════════╗
+        ║           PHASE 2: Data Retrieval & Response                  ║
+        ╚═══════════════════════════════════════════════════════════════╝
+                                          │
+                    ┌─────────────────────┴─────────────────────┐
+                    │          MCP Client (Orchestrator)        │
+                    │   • Route tool request                    │
+                    │   • Manage tool communication             │
+                    └─────────────────────┬─────────────────────┘
+                                          │
+                                          ▼
+                    ┌─────────────────────────────────────────┐
+                    │       MCP Server (Tool Registry)        │
+                    │   • Discover tools                      │
+                    │   • Dispatch calls                      │
+                    └─────────────┬───────────────────────────┘
+                                  │
+         ┌────────────────────────┼────────────────────┬───────────────┐
+         │                        │                    │               │
+         ▼                        ▼                    ▼               ▼
+    ┌─────────┐            ┌─────────┐          ┌─────────┐    ┌──────────┐
+    │Workspace│            │  User   │          │  Other  │    │  Vector  │
+    │  Tool   │            │  Tool   │          │  Tool   │    │Knowledge │
+    └────┬────┘            └────┬────┘          └────┬────┘    └────┬─────┘
+         │                      │                    │              │
+         ▼                      ▼                    ▼              ▼
+    ┌─────────┐            ┌─────────┐          ┌─────────┐    ┌──────────┐
+    │   API   │            │   API   │          │   API   │    │ ChromaDB │
+    │  Data   │            │  Data   │          │  Data   │    │ (Vector  │
+    └─────────┘            └─────────┘          └─────────┘    │   DB)    │
+         │                      │                     │        └──────────┘
+         │                      │                     │              │
+         └──────────────────────┴─────────────────────┴──────────────┘
+                                          │
+                                          ▼
+                    ┌─────────────────────────────────────────┐
+                    │   Aggregate Tool Results                │
+                    │   • Combine data from tool              │
+                    │   • Build context                       │
+                    └─────────────┬───────────────────────────┘
+                                  │
+                                  ▼
+                    ┌─────────────────────────────────────────┐
+                    │   Response Generator (gpt-4/config)     │
+                    │   • Generate natural language response  │
+                    │   • Use tool results as context         │
+                    │   • Stream response word-by-word        │
+                    └─────────────┬───────────────────────────┘
+                                  │
+                                  ▼
+                    ┌─────────────────────────────────────────┐
+                    │   Server-Sent Events (SSE)              │
+                    │   data: {"content": "word"}             │
+                    │   data: {"done": true}                  │
+                    └─────────────────────────────────────────┘
 ```
 
 ### Component Flow
-1. **User Request** → Client sends prompt to the LLM Orchestrator (OpenAI)
-2. **Prompt Analysis** → Orchestrator analyzes intent and determines required tools
-3. **MCP Client** → Routes tool requests through Model Context Protocol client
-4. **MCP Server** → Central tool registry that manages and dispatches tool calls
-5. **Tool Execution** → Individual tools execute their specific operations:
+
+#### Detailed Request Flow (Two-Phase Architecture)
+
+**Phase 1: Intent Analysis (Cost Optimization)**
+1. **User Request** → Client sends prompt to the system
+2. **Cheap Model Analysis** → Uses `gpt-4o-mini` (cheaper, faster) to analyze the prompt
+3. **Tool Detection** → The model identifies which MCP tool should be called
+4. **JSON Response** → Returns tool information as structured JSON including:
+   - Tool name
+   - Required parameters
+   - User intent classification
+5. **Fallback Strategy** → If no specific tool is detected, `vectorKnowledge` tool is automatically selected as the default option
+
+**Phase 2: Data Retrieval and Response Generation**
+6. **MCP Client** → Routes the detected tool request through Model Context Protocol
+7. **MCP Server** → Central tool registry dispatches the call to the appropriate tool
+8. **Tool Execution** → The selected tool executes its specific operation:
    - **Workspace Tool** → Manages workspace data via API connection
    - **User Tool** → Handles user information via API connection
-   - **Vector Tool** → Performs semantic search in ChromaDB Vector Database
+   - **Vector Tool** → Performs semantic search in ChromaDB Vector Database (default fallback)
    - **Other Tools** → Additional custom tools with their API connections
-6. **Response Aggregation** → Tool results are returned to the MCP Server
-7. **Context Building** → MCP Client combines results and sends to Orchestrator
-8. **Response Generation** → OpenAI generates final response with full context
-9. **Streaming** → Response streamed back to client via SSE
+9. **Response Aggregation** → Tool results are returned to the MCP Server
+10. **Context Building** → MCP Client combines tool results with original prompt
+11. **Final Response Generation** → Uses `gpt-4` (or configured model) to generate natural language response with full context
+12. **Streaming** → Response streamed back to client via Server-Sent Events (SSE)
+
+#### Why Two-Phase Architecture?
+
+✅ **Cost Efficiency**: Uses cheaper `gpt-4o-mini` for intent analysis (high frequency operation)  
+✅ **Performance**: Fast tool detection without compromising accuracy  
+✅ **Quality**: Reserves expensive `gpt-4` for final response generation where quality matters most  
+✅ **Fallback Safety**: Always has `vectorKnowledge` tool as a backup to prevent empty responses  
+✅ **Smart Routing**: Ensures relevant data is retrieved before generating the final answer
 
 ### Key Components
 
 #### LLM Orchestrator (OpenAI)
+- **Two-Model Strategy**: 
+  - `gpt-4o-mini`: Fast, cost-effective prompt analysis and tool detection
+  - `gpt-4` (or configured model): High-quality final response generation
 - **MCP Client Integration**: Embedded client that communicates with MCP Server
 - **Intelligent Routing**: Analyzes prompts and determines which tools to invoke
-- **Response Generation**: Creates natural language responses using GPT-4
-- **Streaming Support**: Real-time response streaming to end users
+- **Default Fallback**: Automatically uses `vectorKnowledge` tool when no specific tool is detected
+- **Response Generation**: Creates natural language responses with full context
+- **Streaming Support**: Real-time response streaming to end users via SSE
 
 #### MCP Server
 - **Tool Registry**: Central hub for all available tools
 - **Request Routing**: Dispatches tool calls to appropriate handlers
 - **Protocol Implementation**: Implements Model Context Protocol standard
 - **Extensibility**: Easy addition of new tools without modifying core logic
+- **Tool Discovery**: Provides tool schemas for prompt analysis phase
 
 #### Tools Layer
 Each tool provides specific capabilities:
 - **Workspace Tool**: Access and manage workspace configurations and settings
 - **User Tool**: Retrieve and update user profiles and preferences
-- **Vector Tool**: Semantic search across knowledge base using embeddings
+- **Vector Tool** (Default Fallback): Semantic search across knowledge base using embeddings
+  - Automatically selected when intent is unclear
+  - Searches through ChromaDB for relevant information
+  - Provides context-aware responses using RAG (Retrieval Augmented Generation)
 - **Custom Tools**: Extensible architecture allows for unlimited tool additions
 
 #### Data Layer
