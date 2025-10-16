@@ -10,6 +10,8 @@ const APP_VERSION = process.env.APP_VERSION;
 const APP_ENV = process.env.APP_ENV;
 const URL_DOMAIN = process.env.URL_DOMAIN;
 const APP_NAME = process.env.APP_NAME;
+const HTTPS_PORT = process.env.HTTPS_PORT || 443;
+const ENABLE_HTTPS = process.env.ENABLE_HTTPS === 'true';
 
 
 export {
@@ -19,5 +21,7 @@ export {
   APP_VERSION,
   APP_ENV,
   URL_DOMAIN,
-  APP_NAME
+  APP_NAME,
+  HTTPS_PORT,
+  ENABLE_HTTPS
 };
